@@ -8,12 +8,10 @@ import (
 )
 
 type SSOJwtClaim struct {
-	Nama         string  `json:"nama"`
-	User         string  `json:"user"`
-	Npm          string  `json:"npm"`
-	Jurusan      Jurusan `json:"jurusan"`
-	IsAdmin      bool    `json:"is_admin"`
-	IsSuperAdmin bool    `json:"is_super_admin"`
+	Nama    string  `json:"nama"`
+	User    string  `json:"user"`
+	Npm     string  `json:"npm"`
+	Jurusan Jurusan `json:"jurusan"`
 	jwt.RegisteredClaims
 }
 
@@ -30,8 +28,6 @@ func CreateAccessToken(config SSOConfig, ssoResponse ServiceResponse) (token str
 		User:             ssoResponse.AuthenticationSuccess.User,
 		Npm:              ssoResponse.AuthenticationSuccess.Attributes.Npm,
 		Jurusan:          ssoResponse.AuthenticationSuccess.Attributes.Jurusan,
-		IsAdmin:          ssoResponse.AuthenticationSuccess.Attributes.IsAdmin,
-		IsSuperAdmin:     ssoResponse.AuthenticationSuccess.Attributes.IsSuperAdmin,
 		RegisteredClaims: RegisteredClaims,
 	}
 
@@ -56,8 +52,6 @@ func CreateRefreshToken(config SSOConfig, ssoResponse ServiceResponse) (token st
 		User:             ssoResponse.AuthenticationSuccess.User,
 		Npm:              ssoResponse.AuthenticationSuccess.Attributes.Npm,
 		Jurusan:          ssoResponse.AuthenticationSuccess.Attributes.Jurusan,
-		IsAdmin:          ssoResponse.AuthenticationSuccess.Attributes.IsAdmin,
-		IsSuperAdmin:     ssoResponse.AuthenticationSuccess.Attributes.IsSuperAdmin,
 		RegisteredClaims: RegisteredClaims,
 	}
 

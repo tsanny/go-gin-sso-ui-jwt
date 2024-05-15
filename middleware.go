@@ -72,8 +72,6 @@ func MakeRefreshTokenMiddleware(config SSOConfig) gin.HandlerFunc {
 							Major:        jurusan["major"].(string),
 							Program:      jurusan["program"].(string),
 						},
-						IsAdmin:      claims["is_admin"].(bool),
-						IsSuperAdmin: claims["is_super_admin"].(bool),
 					},
 				},
 			}

@@ -45,15 +45,13 @@ type AuthenticationSuccess struct {
 }
 
 type Attributes struct {
-	XMLName      xml.Name `xml:"attributes" json:"-"`
-	Ldap_cn      string   `xml:"ldap_cn" xml:"ldap_cn"`
-	Kd_org       string   `xml:"kd_org" json:"kd_org"`
-	Peran_user   string   `xml:"peran_user" json:"peran_user"`
-	Nama         string   `xml:"nama" json:"nama"`
-	Npm          string   `xml:"npm" json:"npm"`
-	Jurusan      Jurusan  `json:"jurusan"`
-	IsAdmin      bool     `json:"is_admin"`
-	IsSuperAdmin bool     `json:"is_super_admin"`
+	XMLName    xml.Name `xml:"attributes" json:"-"`
+	Ldap_cn    string   `xml:"ldap_cn" xml:"ldap_cn"`
+	Kd_org     string   `xml:"kd_org" json:"kd_org"`
+	Peran_user string   `xml:"peran_user" json:"peran_user"`
+	Nama       string   `xml:"nama" json:"nama"`
+	Npm        string   `xml:"npm" json:"npm"`
+	Jurusan    Jurusan  `json:"jurusan"`
 }
 
 type Jurusan struct {
