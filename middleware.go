@@ -1,52 +1,50 @@
 package ssojwt
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
 )
 
-func MakeAccessTokenMiddleware(config SSOConfig, key string) func(nextHandler http.Handler) http.Handler {
-	return func(nextHandler http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			authorization := r.Header.Get("Authorization")
-			AuthorizationMap := strings.Split(authorization, " ")
-			if len(AuthorizationMap) != 2 {
-				w.WriteHeader(http.StatusUnauthorized)
-				fmt.Fprintf(w, "{\"error\": \"invalid_token\"}")
-				return
-			}
-			tokenString := AuthorizationMap[1]
-			token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-				return []byte(config.AccessTokenSecretKey), nil
-			})
-			if err != nil {
-				w.WriteHeader(http.StatusUnauthorized)
-				fmt.Fprintf(w, "{\"error\": \"invalid_token\"}")
-				return
-			}
-			ctx := r.Context()
-
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if ok && token.Valid {
-				ctx = context.WithValue(ctx, key, claims)
-			}
-			nextHandler.ServeHTTP(w, r.WithContext(ctx))
+func MakeAccessTokenMiddleware(config SSOConfig, key string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authorization := c.GetHeader("Authorization")
+		AuthorizationMap := strings.Split(authorization, " ")
+		if len(AuthorizationMap) != 2 {
+			c.JSON(http.StatusUnauthorized, gin.H{"status": 401, "error": "invalid_token"})
+			c.Abort()
+			return
+		}
+		tokenString := AuthorizationMap[1]
+		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+			return []byte(config.AccessTokenSecretKey), nil
 		})
+		if err != nil {
+			if err.Error() == "Token is expired" {
+				c.JSON(http.StatusUnauthorized, gin.H{"status": 401, "error": "expired_token"})
+				c.Abort()
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"status": 401, "error": "invalid_token"})
+				c.Abort()
+			}
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if ok && token.Valid {
+			c.Set(key, claims)
+		}
 	}
 }
 
-func MakeRefreshTokenMiddleware(config SSOConfig) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authorization := r.Header.Get("Authorization")
+func MakeRefreshTokenMiddleware(config SSOConfig) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authorization := c.Request.Header.Get("Authorization")
 		AuthorizationMap := strings.Split(authorization, " ")
 		if len(AuthorizationMap) != 2 {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintf(w, "{\"error\": \"invalid_token\"}")
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		tokenString := AuthorizationMap[1]
@@ -54,8 +52,7 @@ func MakeRefreshTokenMiddleware(config SSOConfig) http.Handler {
 			return []byte(config.RefreshTokenSecretKey), nil
 		})
 		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			fmt.Fprintf(w, "{\"error\": \"invalid_token\"}")
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 
@@ -75,37 +72,33 @@ func MakeRefreshTokenMiddleware(config SSOConfig) http.Handler {
 							Major:        jurusan["major"].(string),
 							Program:      jurusan["program"].(string),
 						},
+						IsAdmin:      claims["is_admin"].(bool),
+						IsSuperAdmin: claims["is_super_admin"].(bool),
 					},
 				},
 			}
+
 			accessToken, err := CreateAccessToken(config, newClaims)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "{\"error\": \"internal_server_error\"}")
+				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
 
 			refreshToken, err := CreateRefreshToken(config, newClaims)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprintf(w, "{\"error\": \"internal_server_error\"}")
+				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
+
 			res := LoginResponse{
 				AccessToken:  accessToken,
 				RefreshToken: refreshToken,
 				Fakultas:     nil,
 			}
 
-			w.WriteHeader(http.StatusOK)
-			resJson, _ := json.Marshal(res)
-			fmt.Fprintf(w, "%s", resJson)
+			c.JSON(http.StatusOK, res)
 			return
 		}
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintf(w, "{\"error\": \"invalid_token\"}")
-		return
-
-	})
-
+		c.AbortWithStatus(http.StatusUnauthorized)
+	}
 }

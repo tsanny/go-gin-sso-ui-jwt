@@ -2,10 +2,14 @@ package ssojwt
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 type SSOConfig struct {
@@ -16,9 +20,11 @@ type SSOConfig struct {
 	ServiceUrl             string
 	OriginUrl              string
 	CasURL                 string
+	SuccessSSOAuthRedirect string
+	RedirectToFrontend     bool
 }
 
-func MakeSSOConfig(accessTokenExpireTime, refreshTokenExpireTime time.Duration, accessTokenSecretKey, refreshTokenSecretKey, serviceUrl, originUrl string) SSOConfig {
+func MakeSSOConfig(accessTokenExpireTime, refreshTokenExpireTime time.Duration, accessTokenSecretKey, refreshTokenSecretKey, serviceUrl, originUrl, successSSOAuthRedirect string, redirectToFrontend bool) SSOConfig {
 	return SSOConfig{
 		AccessTokenExpireTime:  accessTokenExpireTime,
 		RefreshTokenExpireTime: refreshTokenExpireTime,
@@ -27,34 +33,85 @@ func MakeSSOConfig(accessTokenExpireTime, refreshTokenExpireTime time.Duration, 
 		ServiceUrl:             serviceUrl,
 		OriginUrl:              originUrl,
 		CasURL:                 "https://sso.ui.ac.id/cas2/",
+		SuccessSSOAuthRedirect: successSSOAuthRedirect,
+		RedirectToFrontend:     redirectToFrontend,
 	}
 }
 
-func LoginCreator(config SSOConfig, errorLogger *log.Logger) func(w http.ResponseWriter, r *http.Request) {
+func LoginCreator(config SSOConfig, errorLogger *log.Logger) gin.HandlerFunc {
 	if errorLogger == nil {
-		errorLogger = log.New(ioutil.Discard, "Error: ", log.Ldate|log.Ltime)
+		errorLogger = log.New(io.Discard, "Error: ", log.Ldate|log.Ltime)
 	}
 
-	return func(w http.ResponseWriter, r *http.Request) {
-
-		ticket := r.URL.Query().Get("ticket")
+	return func(c *gin.Context) {
+		ticket := c.Request.URL.Query().Get("ticket")
 		res, err := LoginRequestHandler(ticket, config)
 		if err != nil {
-			errorLogger.Printf("error in pasing sso request: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			errorLogger.Printf("error in parsing sso request: %v", err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
 		}
 
-		err = TemplateRenderHandler(res, config, w)
-		if err != nil {
-			errorLogger.Printf("error in render template: %v", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		if res.User == "" {
+			redirectURL := (config.CasURL + "login?service=" + url.QueryEscape(config.ServiceUrl))
+			c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+			return
 		}
+
+		if config.RedirectToFrontend {
+			redirectURL := (config.SuccessSSOAuthRedirect + "?token=" + res.AccessToken)
+			c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+			return
+		}
+
+		c.JSON(http.StatusOK, res)
 		return
 	}
 }
 
+func Logout(config SSOConfig, errorLogger *log.Logger) gin.HandlerFunc {
+	if errorLogger == nil {
+		errorLogger = log.New(io.Discard, "Error: ", log.Ldate|log.Ltime)
+	}
+
+	return func(c *gin.Context) {
+		destination := config.ServiceUrl
+		if config.RedirectToFrontend {
+			destination = config.SuccessSSOAuthRedirect
+		}
+		redirectURL := (config.CasURL + "logout?url=" + url.QueryEscape(destination))
+		c.Redirect(http.StatusTemporaryRedirect, redirectURL)
+		return
+	}
+}
+
+func CheckUserData(errorLogger *log.Logger) gin.HandlerFunc {
+	if errorLogger == nil {
+		errorLogger = log.New(io.Discard, "Error: ", log.Ldate|log.Ltime)
+	}
+
+	return func(c *gin.Context) {
+		data := c.Value("user")
+		if data == nil {
+			data = jwt.MapClaims{"npm": "none"}
+		}
+		c.JSON(http.StatusOK, data)
+	}
+}
+
+func GetRefreshToken(config SSOConfig, errorLogger *log.Logger) gin.HandlerFunc {
+	if errorLogger == nil {
+		errorLogger = log.New(io.Discard, "Error: ", log.Ldate|log.Ltime)
+	}
+
+	return func(c *gin.Context) {
+		refresh := MakeRefreshTokenMiddleware(config)
+		c.JSON(http.StatusOK, refresh)
+	}
+}
+
 func LoginRequestHandler(ticket string, config SSOConfig) (res LoginResponse, err error) {
-	bodyBytes, err := ValidatTicket(config, ticket)
+	bodyBytes, err := ValidateTicket(config, ticket)
 	if err != nil {
 		err = fmt.Errorf("error when cheking ticket: %w", err)
 		return
@@ -69,20 +126,6 @@ func LoginRequestHandler(ticket string, config SSOConfig) (res LoginResponse, er
 	res, err = MakeLoginResponse(config, model)
 	if err != nil {
 		err = fmt.Errorf("error in creating token: %w", err)
-	}
-	return
-}
-
-func TemplateRenderHandler(data interface{}, config SSOConfig, w http.ResponseWriter) (err error) {
-	tmpl, dataRender, err := MakeTemplate(config, data)
-	if err != nil {
-		err = fmt.Errorf("error in making template: %w", err)
-		return
-	}
-
-	err = tmpl.Execute(w, dataRender)
-	if err != nil {
-		err = fmt.Errorf("error in parsing template: %w", err)
 	}
 	return
 }

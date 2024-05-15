@@ -3,11 +3,11 @@ package ssojwt
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
-func ValidatTicket(config SSOConfig, ticket string) (bodyBytes []byte, err error) {
+func ValidateTicket(config SSOConfig, ticket string) (bodyBytes []byte, err error) {
 
 	url := fmt.Sprintf("%sserviceValidate?ticket=%s&service=%s", config.CasURL, ticket, config.ServiceUrl)
 	resp, err := http.Get(url)
@@ -16,7 +16,7 @@ func ValidatTicket(config SSOConfig, ticket string) (bodyBytes []byte, err error
 	}
 
 	defer resp.Body.Close()
-	bodyBytes, err = ioutil.ReadAll(resp.Body)
+	bodyBytes, err = io.ReadAll(resp.Body)
 	return
 }
 
@@ -45,13 +45,15 @@ type AuthenticationSuccess struct {
 }
 
 type Attributes struct {
-	XMLName    xml.Name `xml:"attributes" json:"-"`
-	Ldap_cn    string   `xml:"ldap_cn" xml:"ldap_cn"`
-	Kd_org     string   `xml:"kd_org" json:"kd_org"`
-	Peran_user string   `xml:"peran_user" json:"peran_user"`
-	Nama       string   `xml:"nama" json:"nama"`
-	Npm        string   `xml:"npm" json:"npm"`
-	Jurusan    Jurusan  `json:"jurusan"`
+	XMLName      xml.Name `xml:"attributes" json:"-"`
+	Ldap_cn      string   `xml:"ldap_cn" xml:"ldap_cn"`
+	Kd_org       string   `xml:"kd_org" json:"kd_org"`
+	Peran_user   string   `xml:"peran_user" json:"peran_user"`
+	Nama         string   `xml:"nama" json:"nama"`
+	Npm          string   `xml:"npm" json:"npm"`
+	Jurusan      Jurusan  `json:"jurusan"`
+	IsAdmin      bool     `json:"is_admin"`
+	IsSuperAdmin bool     `json:"is_super_admin"`
 }
 
 type Jurusan struct {

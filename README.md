@@ -2,15 +2,18 @@
 
 Golang Library to use SSO UI as JWT login
 
+Built by Ristek
+
+https://github.com/ristekoss/golang-sso-ui-jwt
+
 ## Installation
 
 `go get github.com/ristekoss/golang-uisso-jwt`
 
-## How to Use
-see example folder
-
+## Example
 
 login handler
+
 ```go
 // set config
 config := ssojwt.MakeSSOConfig(time.Hour*168, time.Hour*720, "super secret access", "super secret refresh", "http://localhost:8080/login", "http://localhost:8080/")
@@ -23,6 +26,7 @@ http.HandleFunc("/login", authMiddleware)
 ```
 
 on the frontend
+
 ```js
 const loginHandler = async () => {
   const data = await popUpLogin();
@@ -59,6 +63,7 @@ const popUpLogin = () => {
 ```
 
 authenticated middleware
+
 ```go
 // set config
 config := ssojwt.MakeSSOConfig(time.Hour*168, time.Hour*720, "super secret access", "super secret refresh", "http://localhost:8080/login", "http://localhost:8080/")
@@ -73,6 +78,7 @@ http.Handle("/check", auth)
 ```
 
 authenticated middleware
+
 ```go
 // set config
 config := ssojwt.MakeSSOConfig(time.Hour*168, time.Hour*720, "super secret access", "super secret refresh", "http://localhost:8080/login", "http://localhost:8080/")
@@ -83,7 +89,3 @@ middle := ssojwt.MakeRefreshTokenMiddleware(config)
 // use handler func
 http.Handle("/refresh", middle)
 ```
-### To-dos
-
-- create fiber handler
-- create better readme.md
